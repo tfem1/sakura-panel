@@ -13,6 +13,7 @@
         actions: [SP.ui.button('Restore defaults', { icon: 'reset', variant: 'ghost', onClick: () => { SP.state.resetSection('graphics'); SP.refresh(); } })],
       }));
 
+      root.append(SP.ui.notConnected('3D settings are stored in GPU driver profiles (NVIDIA NVAPI DRS / AMD ADLX), which SAKURA PANEL does not write yet.'));
       const capOn = SP.state.get('graphics.fpsCap');
       const essentials = SP.ui.card({
         icon: 'bolt', title: 'Essentials', desc: 'The settings that matter most for latency and smoothness',

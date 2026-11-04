@@ -4,7 +4,9 @@ A graphics control panel for Windows, styled after Japanese cherry blossoms.
 
 ![Dashboard](docs/screenshots/01-dashboard.png)
 
-> **Status:** the complete interface, brand identity and theme system are done. **No GPU driver backend is connected yet.** Settings are saved and the apply cycle works end to end, but the values come from `SP.telemetry` and `SP.state.apply()` in place of a real driver. The title bar shows *Demo telemetry* until a backend replaces them.
+> **Status:**
+> - **Display colour is real.** On Windows, Color Control and Presets change what your monitors show, through documented Windows APIs (see [Display colour engine](#display-colour-engine)).
+> - **Not connected yet:** 3D settings, display modes, game profiles, power/fan/clock controls, and GPU telemetry (simulated). Each of those pages says so, and Apply reports them as "saved, not applied".
 
 ## Install (Windows)
 
@@ -41,8 +43,10 @@ npm start            # Electron window (native caption buttons, tray, taskbar ic
 The UI also runs on its own: open `src/index.html` in Chromium or Edge.
 
 ```bash
-npm test                     # 21 end-to-end checks in headless Chromium
-node tests/electron-bridge.js
+npm test                     # colour maths + engine unit tests, UI e2e, full UI -> engine chain (simulated Windows)
+npm run test:display         # Windows only: drives your REAL displays and verifies each change by read-back
+npm run test:win32           # Windows only: low-level probe of every Win32 call (restores what it changes)
+npm run test:electron        # launches the real Electron app and checks preload -> IPC -> engine
 npm run brand                # regenerate every logo / icon / .ico from scripts/brand.js
 node scripts/showcase.js     # regenerate docs/screenshots and the brand sheet
 ```
@@ -105,12 +109,12 @@ Theme file format:
 | Page | What it covers |
 |---|---|
 | Dashboard | Status, quick adjustments, activity, display summary, one-click theme switch, profiles |
-| Color Control | Brightness, contrast, gamma, vibrance and hue, with a live reference image and transfer curve. Advanced: per-channel gamma and output format |
-| Display Settings | Monitor arrangement, resolution, refresh rate, rotation, VRR, HDR. Advanced: scaling, overscan |
-| Game Profiles | Per-program overrides (preset, latency, FPS cap, V-Sync, power, colour) |
-| Presets | Six built-in looks with filtered previews, plus your own saved presets |
-| Advanced Settings | Essential 3D settings first. Advanced: image quality, frame pacing, shaders |
-| Performance | Live chart with toggleable series, power limit, cooling. Advanced: clock offsets |
+| Color Control | **Live.** Per-display tone and RGB (gamma ramp) and global saturation/vibrance/hue (colour matrix). Includes real A/B compare, Restore original, live status with read-back verification, and a self-test |
+| Display Settings | Real monitor list and current mode. Changing modes, VRR, HDR and scaling is *not connected yet* |
+| Game Profiles | Per-program overrides are saved. Automatic switching is *not connected yet* |
+| Presets | **Live.** Six built-in looks plus your own. Applying one changes the selected display immediately |
+| Advanced Settings | 3D settings are saved only. Driver profiles (NVAPI DRS / ADLX) are *not connected yet* |
+| Performance | Telemetry is simulated. Power, fan and clock controls are *not connected yet* |
 | Theme Studio | See above |
 | System Settings | Startup, tray, start page, detail level, animation level, UI scale, export/reset, about |
 
@@ -122,16 +126,37 @@ Theme file format:
 
 **Motion:** page fades, a sliding nav indicator, animated slider fills, spring toggles, expanding sections, toasts, an "applied" flash, a themed splash and theme crossfades. Animations use transform, opacity and colour only: no blur, no particles. Animation levels are Full / Reduced / Off, and the app respects `prefers-reduced-motion`. Telemetry updates once a second and pauses when no page is watching it.
 
+## Display colour engine
+
+Windows offers no single API that does every colour adjustment system-wide. SAKURA PANEL uses the two documented mechanisms that do work, each only for what it can really do.
+
+| Stage | Windows API | Scope | Settings |
+|---|---|---|---|
+| Hardware gamma ramp | `SetDeviceGammaRamp` / `GetDeviceGammaRamp` (GDI): the GPU's output lookup table | **Per display.** Everything on screen, including most full-screen games | Brightness, contrast, gamma, colour temperature, exposure, shadows, highlights, black level, white level, RGB gain / offset / gamma |
+| Colour matrix | `MagSetFullscreenColorEffect` (Magnification API): a 5×5 matrix applied by the desktop compositor | **All displays.** Desktop, windowed and borderless apps and games. Exclusive full-screen games and protected video can bypass it | Saturation, digital vibrance (as a *linear* saturation boost), hue |
+| Not offered | none | none | **Sharpness**: needs a spatial filter, and no system-wide API exists. **Output depth / format / range**: need the NVIDIA or AMD driver API (shown read-only) |
+
+How it works:
+
+- **Live:** dragging a slider sends the change to the main process. Updates are coalesced so Windows gets at most about 60 per second. **Apply** re-applies, verifies and saves; **Discard** restores the previous values; **Hold to compare** shows the real original output.
+- **Calibration preserved:** adjustments are composed on top of each monitor's existing ramp, so neutral settings give back your calibration exactly.
+- **Verified:** every commit reads the ramp and matrix back from Windows. Each display shows *Active · verified*, *Limited by Windows*, *Overridden by another program*, *Unavailable* (for example HDR on, where Windows ignores gamma ramps) or *Failed*. A failure is never reported as success.
+- **Windows' limit:** Windows refuses gamma ramps that move too far from neutral. When that happens, the strongest accepted version is applied and labelled *Limited by Windows (x%)*.
+- **Safety:**
+  - Each monitor's original ramp is backed up before the first change.
+  - A session lock plus a watchdog (the same `electron.exe` in Node mode, no PowerShell) restore the originals if the app crashes; the check also runs again at the next launch.
+  - **When SAKURA PANEL quits** (System Settings): *Restore colours* (default), or *Keep gamma*. The colour matrix always ends with the process.
+  - Monitor connect/disconnect, resolution/refresh/rotation changes, resume and unlock all trigger a re-enumeration and a verified re-apply.
+- **Not used:** vendor APIs (NVAPI, ADLX) and undocumented driver calls.
+
 ## Structure
 
 ```
-electron/      main.js (window, native caption overlay, tray, single instance, window state), preload.js (validated bridge)
-src/           index.html, css/, js/ (themes, theme-engine, ui components, state, data, app shell, pages/)
-assets/        brand/ and icons/ (generated)
-scripts/       brand.js (asset generator), showcase.js (screenshots)
-tests/         e2e.js, electron-bridge.js
+electron/         main.js (window, caption overlay, tray, single instance, colour IPC, self-test CLI), preload.js
+electron/color/   win32.js (koffi bindings: GDI, DisplayConfig, Magnification), engine.js, watchdog.js, selftest.js
+src/              index.html, css/, js/ (color-math.js shared with main, color-bridge.js, state, theme engine, ui, pages/)
+assets/           brand/ and icons/ (generated)
+scripts/          brand.js, showcase.js, run-display-selftest.js
+tests/            color-math / color-engine unit tests, e2e.js, electron-bridge.js (UI -> real engine -> simulated Windows),
+                  electron-ipc.js (real Electron), win32-probe.js (real Win32 calls)
 ```
-
-**Connecting real hardware:**
-1. Replace `SP.telemetry` (`src/js/data.js`) and the body of `SP.state.apply()` (`src/js/state.js`) with calls through `preload.js` to a native driver module.
-2. Remove the *Demo telemetry* chip.

@@ -21,6 +21,7 @@
         actions: [SP.ui.button('Restore defaults', { icon: 'reset', variant: 'ghost', onClick: () => { SP.state.resetSection('performance'); SP.refresh(); } })],
       }));
 
+      root.append(SP.ui.notConnected('Monitoring values are simulated, and power, fan and clock controls need vendor driver APIs (NVML / NVAPI / ADLX).'));
       const shown = new Set(SP.store.get('perf.series', ['load', 'temp']));
       const svg = document.createElementNS(NS, 'svg');
       svg.setAttribute('viewBox', '0 0 600 180'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'sp-chart');

@@ -26,6 +26,7 @@
         actions: [SP.ui.button('Add profile', { icon: 'plus', variant: 'primary', onClick: add })],
       }));
 
+      root.append(SP.ui.notConnected('Profiles are not switched automatically: this build does not watch which game is running.'));
       /* List */
       const filter = h('input', { class: 'sp-input', type: 'search', placeholder: 'Filter profiles', 'aria-label': 'Filter profiles' });
       const items = list.map((p) => h('button', {

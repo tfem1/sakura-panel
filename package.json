@@ -2,13 +2,16 @@
   "name": "sakura-panel",
   "productName": "SAKURA PANEL",
   "version": "1.0.0",
-  "description": "SAKURA PANEL — premium graphics control panel for Windows.",
+  "description": "SAKURA PANEL \u2014 premium graphics control panel for Windows.",
   "main": "electron/main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
     "brand": "node scripts/brand.js",
-    "test": "node tests/e2e.js",
+    "test": "node --test tests/color-math.test.js tests/color-engine.test.js && node tests/e2e.js && node tests/electron-bridge.js",
+    "test:display": "node scripts/run-display-selftest.js",
+    "test:win32": "node tests/win32-probe.js",
+    "test:electron": "node tests/electron-ipc.js",
     "dist": "electron-builder --win"
   },
   "devDependencies": {
@@ -30,7 +33,9 @@
       "assets/icons/taskbar-icon-32.png"
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icons/sakura-panel.ico"
     },
     "nsis": {
@@ -41,6 +46,13 @@
       "shortcutName": "SAKURA PANEL",
       "installerIcon": "assets/icons/sakura-panel.ico",
       "uninstallerIcon": "assets/icons/sakura-panel.ico"
-    }
+    },
+    "asarUnpack": [
+      "node_modules/koffi/**",
+      "node_modules/@koromix/**"
+    ]
+  },
+  "dependencies": {
+    "koffi": "3.3.3"
   }
 }

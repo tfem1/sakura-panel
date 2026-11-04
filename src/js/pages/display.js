@@ -18,6 +18,7 @@
         actions: [SP.ui.button('Identify', { icon: 'info', variant: 'ghost', onClick: () => SP.ui.toast('Identify: numbers shown on each display', { type: 'info' }) })],
       }));
 
+      root.append(SP.ui.notConnected('Resolution, refresh rate, rotation, VRR, HDR and scaling need display-mode and driver APIs that this build does not call. The monitors and current modes shown are real.'));
       /* Arrangement */
       const arr = h('div', { class: 'sp-arrange' }, SP.DISPLAYS.map((x, i) => h('button', {
         type: 'button', class: 'sp-monitor' + (x.id === d.id ? ' is-active' : ''), 'aria-pressed': String(x.id === d.id),

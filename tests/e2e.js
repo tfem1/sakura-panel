@@ -81,19 +81,22 @@ fs.mkdirSync(OUT, { recursive: true });
 
   // Apply cycle
   await pg.evaluate(() => SP.go('color')); await wait(300);
-  await pg.$eval('.sp-row[data-path="color.brightness"] input[type=range]', (e) => { e.value = 72; e.dispatchEvent(new Event('input')); });
+  const bPath = await pg.evaluate(() => SP.tonePath('brightness'));
+  const cPath = await pg.evaluate(() => SP.tonePath('contrast'));
+  await pg.$eval(`.sp-row[data-path="${bPath}"] input[type=range]`, (e) => { e.value = 72; e.dispatchEvent(new Event('input')); });
   await wait(100);
   assert.ok(await pg.$eval('.sp-applybar', (e) => e.classList.contains('is-visible')));
-  assert.ok(await pg.$eval('.sp-row[data-path="color.brightness"]', (e) => e.classList.contains('is-modified'))); ok('change shows apply bar + modified marker');
+  assert.ok(await pg.$eval(`.sp-row[data-path="${bPath}"]`, (e) => e.classList.contains('is-modified'))); ok('change shows apply bar + modified marker');
+  assert.ok((await pg.textContent('.sp-engine-banner')).includes('Preview build')); ok('browser preview says plainly that the screen will not change');
   await pg.click('.sp-applybar .sp-btn-primary'); await wait(1000);
   assert.ok(!(await pg.$eval('.sp-applybar', (e) => e.classList.contains('is-visible')))); ok('apply clears the bar');
   await pg.reload(); await wait(900);
-  assert.equal(await pg.evaluate(() => SP.state.applied.color.brightness), 72); ok('applied settings persist');
+  assert.equal(await pg.evaluate((p) => SP.state.getApplied(p), bPath), 72); ok('applied settings persist');
   await pg.evaluate(() => SP.go('color')); await wait(200);
-  await pg.$eval('.sp-row[data-path="color.contrast"] input[type=range]', (e) => { e.value = 10; e.dispatchEvent(new Event('input')); });
+  await pg.$eval(`.sp-row[data-path="${cPath}"] input[type=range]`, (e) => { e.value = 10; e.dispatchEvent(new Event('input')); });
   await pg.click('.sp-applybar >> text=Discard'); await wait(200);
-  assert.equal(await pg.evaluate(() => SP.state.draft.color.contrast), 50);
-  assert.equal(await pg.$eval('.sp-row[data-path="color.contrast"] input', (e) => e.value), '50'); ok('discard reverts');
+  assert.equal(await pg.evaluate((p) => SP.state.get(p), cPath), 50);
+  assert.equal(await pg.$eval(`.sp-row[data-path="${cPath}"] input`, (e) => e.value), '50'); ok('discard reverts');
 
   // Search reveals advanced settings
   await pg.evaluate(() => SP.state.set('system.view', 'simple')); await wait(100);

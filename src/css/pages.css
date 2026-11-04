@@ -251,3 +251,41 @@ html[data-view='advanced'] .simple-only { display: none !important; }
 .sp-about-icons figure { margin: 0; display: grid; justify-items: center; gap: 6px; }
 .sp-about-icons figcaption { font-size: 11px; color: var(--sp-text-faint); }
 .sp-about > p { font-size: 12.5px; text-align: center; }
+
+/* ---------------- Colour engine status ---------------- */
+.sp-engine { padding: 14px 16px; display: grid; gap: 10px; }
+.sp-engine-banner, .sp-notconnected { margin-bottom: 16px; }
+.sp-notconnected strong, .sp-engine-banner strong { color: var(--sp-text); }
+.sp-engine-pills { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.sp-engine-pill { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--sp-raised); border: 1px solid var(--sp-border); min-width: 0; }
+.sp-engine-pill > i { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--sp-text-faint); }
+.sp-engine-pill.is-ok > i { background: var(--sp-success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sp-success) 18%, transparent); }
+.sp-engine-pill.is-warn > i { background: var(--sp-warning); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sp-warning) 18%, transparent); }
+.sp-engine-pill.is-bad > i { background: var(--sp-danger); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sp-danger) 18%, transparent); }
+.sp-engine-pill small { display: block; font-size: 11.5px; color: var(--sp-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-engine-pill strong { display: flex; align-items: center; gap: 8px; font-weight: 500; flex-wrap: wrap; }
+.sp-engine-pill > div { min-width: 0; }
+.sp-verified { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--sp-success); }
+.sp-verified .sp-icon { width: 12px; height: 12px; }
+.sp-engine-msgs { display: grid; gap: 8px; }
+.sp-engine-msgs:empty { display: none; }
+.sp-caption { font-size: 12px; color: var(--sp-text-muted); margin-top: 10px; }
+.sp-readonly { font-size: 12.5px; color: var(--sp-text-muted); padding: 6px 10px; border-radius: 8px; background: var(--sp-raised); border: 1px solid var(--sp-border); white-space: nowrap; }
+.sp-curve .curve.is-r { stroke: #FF5A6E; } .sp-curve .curve.is-g { stroke: #4FD18B; } .sp-curve .curve.is-b { stroke: #5B9BFF; }
+.sp-curve .curve { stroke-width: 1.6; mix-blend-mode: normal; }
+.sp-btn.is-active { background: var(--sp-primary-soft); color: var(--sp-text); }
+.sp-hero-sim { position: relative; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--sp-text-muted); margin: -6px 0 10px; }
+.sp-hero-sim .sp-icon { width: 14px; height: 14px; color: var(--sp-warning); }
+.sp-chip i.is-off { width: 7px; height: 7px; border-radius: 50%; background: var(--sp-text-faint); }
+
+.sp-selftest { display: grid; gap: 4px; margin-top: 12px; max-height: 360px; overflow: auto; }
+.sp-selftest:empty { display: none; }
+.sp-selftest-sum { font-weight: 600; padding: 8px 10px; border-radius: 9px; margin-bottom: 4px; }
+.sp-selftest-sum.is-ok { color: var(--sp-success); background: color-mix(in srgb, var(--sp-success) 12%, transparent); }
+.sp-selftest-sum.is-bad { color: var(--sp-danger); background: color-mix(in srgb, var(--sp-danger) 12%, transparent); }
+.sp-selftest-row { display: flex; gap: 10px; align-items: flex-start; padding: 6px 8px; border-radius: 8px; animation: sp-fade var(--t) ease; }
+.sp-selftest-row strong { display: block; font-weight: 500; font-size: 12.5px; }
+.sp-selftest-row small { display: block; color: var(--sp-text-muted); font-size: 11.5px; word-break: break-word; }
+.sp-selftest-st { width: 20px; height: 20px; flex: none; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--sp-raised); color: var(--sp-text-faint); }
+.sp-selftest-row.is-pass .sp-selftest-st { color: var(--sp-success); background: color-mix(in srgb, var(--sp-success) 14%, transparent); }
+.sp-selftest-row.is-fail .sp-selftest-st { color: var(--sp-danger); background: color-mix(in srgb, var(--sp-danger) 14%, transparent); }

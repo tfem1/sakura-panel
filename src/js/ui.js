@@ -274,5 +274,11 @@
     });
   }
 
-  SP.ui = { h, icon, mark, markSVG, button, slider, toggle, select, segmented, row, card, expander, pageHeader, stat, toast, dialog };
+  /** Honest banner for settings that have no hardware backend yet. */
+  function notConnected(what) {
+    return h('div', { class: 'sp-note is-warn sp-notconnected' }, icon('info'),
+      h('span', null, h('strong', null, 'Not connected to the GPU driver yet. '), what + ' Changes are saved, but nothing on your system changes. Display colour in ', h('button', { type: 'button', class: 'sp-link', onclick: () => SP.go('color') }, 'Color Control'), ' is live.'));
+  }
+
+  SP.ui = { h, icon, mark, markSVG, notConnected, button, slider, toggle, select, segmented, row, card, expander, pageHeader, stat, toast, dialog };
 })();

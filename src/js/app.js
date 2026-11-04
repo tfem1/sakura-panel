@@ -21,7 +21,7 @@
     root.dataset.view = s.view;
     root.dataset.motion = s.motion;
     root.style.setProperty('--ui-scale', String(s.scale / 100));
-    if (window.sakura && window.sakura.setPrefs) window.sakura.setPrefs({ tray: s.tray, startWithWindows: s.startWithWindows });
+    if (window.sakura && window.sakura.setPrefs) window.sakura.setPrefs({ tray: s.tray, startWithWindows: s.startWithWindows, colorOnExit: s.colorOnExit });
   }
   applyPrefs();
 
@@ -64,7 +64,7 @@
     mark(18),
     h('div', { class: 'sp-brand-word' }, h('b', null, 'SAKURA'), h('span', null, 'PANEL')),
     h('div', { class: 'sp-titlebar-spacer' }),
-    h('div', { class: 'sp-titlebar-status', title: 'No hardware backend is connected — values are simulated.' }, h('i'), 'Demo telemetry'),
+    h('div', { class: 'sp-titlebar-status', title: 'GPU temperature, load and clocks are simulated: no driver telemetry backend yet. Display colour control is real (Windows app).' }, h('i'), 'Telemetry simulated'),
     h('div', { class: 'sp-winctrls' }, winBtn('minimize', 'minimize'), winBtn('maximize', 'maximize'), winBtn('close', 'close', 'is-close')));
 
   const scroller = h('div', { class: 'sp-scroll' });
@@ -134,10 +134,21 @@
   async function doApply() {
     if (!SP.state.changes()) return;
     applybar.classList.add('is-applying');
-    await SP.state.apply();
+    const out = await SP.state.apply();
     applybar.classList.remove('is-applying');
-    main.classList.remove('is-flash'); void main.offsetWidth; main.classList.add('is-flash');
-    SP.ui.toast('Settings applied');
+    const cr = out.colorResult;
+    if (out.colorChanged && cr && !cr.ok) {
+      // Never report success when Windows refused or could not verify a change.
+      SP.ui.toast('Some colour changes could not be applied to the display. See Color Control for details.', { type: 'error', duration: 6000 });
+    } else if (out.colorChanged && cr && cr.ok) {
+      main.classList.remove('is-flash'); void main.offsetWidth; main.classList.add('is-flash');
+      SP.ui.toast('Colour applied to the display and verified');
+    } else if (out.colorChanged && !SP.colorEngine.available) {
+      SP.ui.toast('Saved. Display colour control needs the SAKURA PANEL Windows app; this preview cannot change your screen.', { type: 'info', duration: 6000 });
+    }
+    if (out.otherChanged) {
+      SP.ui.toast('Saved. 3D, display-mode, profile and performance settings are not connected to the GPU driver yet, so they do not change anything.', { type: 'info', duration: 7000 });
+    }
     markModified();
   }
   SP.applyNow = doApply;
@@ -207,8 +218,18 @@
 
   /* ---------------- boot ---------------- */
   window.addEventListener('hashchange', () => { const id = location.hash.replace('#/', ''); if (id !== current) render(byId[id] ? id : 'dashboard'); });
-  const start = location.hash.replace('#/', '') || SP.state.applied.system.startPage;
-  go(byId[start] ? start : 'dashboard', { animate: false });
+  // Wait for the colour engine's display list (hidden behind the splash), max 2.5 s.
+  const engineReady = SP.colorEngine.ready || Promise.resolve();
+  Promise.race([engineReady, new Promise((r) => setTimeout(r, 2500))]).then(() => {
+    SP.seedColorDisplays();
+    const start = location.hash.replace('#/', '') || SP.state.applied.system.startPage;
+    go(byId[start] ? start : 'dashboard', { animate: false });
+    const st = SP.colorEngine.status;
+    if (st && st.recovered) {
+      const n = st.recovered.restored.length;
+      SP.ui.toast(`SAKURA PANEL did not close normally last time. Original colours were restored on ${n} display${n === 1 ? '' : 's'}.`, { type: 'info', duration: 7000 });
+    }
+  });
 
   const splash = document.getElementById('splash');
   if (splash) {

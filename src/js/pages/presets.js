@@ -3,14 +3,18 @@
   const SP = window.SP;
   const { h, icon } = SP.ui;
   const KEYS = ['brightness', 'contrast', 'gamma', 'vibrance', 'hue'];
+  // Tone keys live on the selected display (gamma ramp); vibrance and hue are global (colour matrix).
+  const GLOBAL = new Set(['vibrance', 'hue']);
+  const pathFor = (k) => (GLOBAL.has(k) ? 'color.global.' + k : SP.tonePath(k));
 
   const userPresets = () => SP.store.get('presets.user', []).filter((p) => p && p.values);
-  const matches = (v) => KEYS.every((k) => Math.abs(Number(SP.state.draft.color[k]) - Number(v[k])) < 0.001);
+  const matches = (v) => KEYS.every((k) => Math.abs(Number(SP.state.get(pathFor(k))) - Number(v[k] != null ? v[k] : k === 'gamma' ? 1 : k === 'hue' ? 0 : 50)) < 0.001);
 
   function stage(p) {
-    KEYS.forEach((k) => SP.state.set('color.' + k, p.values[k]));
-    SP.state.set('color.source', 'custom');
-    SP.ui.toast(`“${p.name}” staged — press Apply to use it`, { type: 'info' });
+    SP.state.set(SP.tonePath('source'), 'custom');
+    KEYS.forEach((k) => SP.state.set(pathFor(k), p.values[k] != null ? p.values[k] : k === 'gamma' ? 1 : k === 'hue' ? 0 : 50));
+    const live = SP.colorEngine.available && SP.colorEngine.status && SP.colorEngine.status.supported;
+    SP.ui.toast(live ? `“${p.name}” is now on your display — press Apply to keep it, Discard to undo` : `“${p.name}” staged — press Apply to save it`, { type: 'info', duration: 4500 });
     SP.refresh();
   }
 
@@ -42,14 +46,13 @@
       const save = async () => {
         const name = await SP.ui.dialog({ title: 'Save as preset', body: 'Saves the current brightness, contrast, gamma, vibrance and hue.', confirmText: 'Save', input: { label: 'Preset name', value: 'My preset' } });
         if (!name) return;
-        const c = SP.state.draft.color;
-        const p = { id: 'u' + Date.now().toString(36), name: name.slice(0, 40), created: Date.now(), values: Object.fromEntries(KEYS.map((k) => [k, c[k]])) };
+        const p = { id: 'u' + Date.now().toString(36), name: name.slice(0, 40), created: Date.now(), values: Object.fromEntries(KEYS.map((k) => [k, SP.state.get(pathFor(k))])) };
         SP.store.set('presets.user', [...userPresets(), p]);
         SP.ui.toast(`Preset “${p.name}” saved`);
         SP.refresh();
       };
       root.append(SP.ui.pageHeader({
-        eyebrow: '3D & Gaming', title: 'Presets', desc: 'Pick a look to stage it, then press Apply. Presets change colour only — 3D settings stay as they are.',
+        eyebrow: '3D & Gaming', title: 'Presets', desc: 'A preset changes your selected display live (brightness, contrast, gamma) plus the global vibrance and hue. Press Apply to keep it. Thumbnails are illustrations of each look.',
         actions: [SP.ui.button('Save current as preset', { icon: 'save', onClick: save })],
       }));
       root.append(h('div', { class: 'sp-section-title' }, h('h2', null, 'Built-in looks'), h('span', { class: 'sp-muted' }, SP.COLOR_PRESETS.length + ' presets')));

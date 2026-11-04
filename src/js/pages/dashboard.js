@@ -23,7 +23,12 @@
     id: 'dashboard', title: 'Dashboard', group: 'overview', icon: 'dashboard',
     search: ['Quick adjust', 'GPU status', 'Theme quick switch', 'Active profiles'],
     render(root) {
-      const d = SP.DISPLAYS.find((x) => x.id === SP.state.get('display.active')) || SP.DISPLAYS[0];
+      const d = SP.DISPLAYS.find((x) => x.id === SP.colorKey()) || SP.DISPLAYS[0];
+      const E = SP.colorEngine;
+      const live = !!(E.available && E.status && E.status.supported);
+      const dInfo = E.displayInfo(d.id);
+      const quickOff = SP.state.get(SP.tonePath('source')) === 'default' || !!(dInfo && dInfo.hdr && dInfo.hdr.enabled);
+      const gpu = live && E.status.gpus && E.status.gpus[0];
       const hour = new Date().getHours();
       const greet = hour < 5 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
@@ -38,11 +43,12 @@
           h('div', { class: 'sp-hero-mark' }, SP.ui.mark(46)),
           h('div', null,
             h('div', { class: 'sp-hero-kicker' }, 'Graphics adapter'),
-            h('h2', null, 'Simulated GPU', h('span', null, ' · 16 GB')),
+            h('h2', null, gpu ? gpu.name : 'Graphics adapter', gpu ? null : h('span', null, ' · not detected in this preview')),
             h('div', { class: 'sp-hero-meta' },
-              h('span', { class: 'sp-chip' }, h('i', { class: 'is-ok' }), 'Running'),
+              h('span', { class: 'sp-chip', title: live ? 'Display colour engine connected to Windows' : 'Preview build: no access to the display' }, h('i', { class: live ? 'is-ok' : 'is-off' }), live ? 'Colour engine active' : 'Colour engine offline'),
               h('span', { class: 'sp-chip' }, icon('display'), d.name + ' · ' + d.model),
               h('span', { class: 'sp-chip' }, icon('gamepad'), 'Profile: Global')))),
+        h('div', { class: 'sp-hero-sim' }, icon('info'), 'Load, temperature, clock and VRAM below are simulated: no driver telemetry backend yet.'),
         h('div', { class: 'sp-grid sp-grid-4 sp-hero-stats' },
           SP.ui.stat({ id: 'load', icon: 'activity', label: 'GPU load', value: '—', unit: '%', meter: 0 }),
           SP.ui.stat({ id: 'temp', icon: 'temp', label: 'Temperature', value: '—', unit: '°C', meter: 0 }),
@@ -51,13 +57,13 @@
 
       /* Quick adjust */
       const quick = SP.ui.card({
-        icon: 'sun', title: 'Quick adjust', desc: 'Desktop colour for ' + d.name,
+        icon: 'sun', title: 'Quick adjust', desc: (live ? 'Live on ' : 'Saved for ') + d.name + ' · vibrance applies to all displays',
         actions: SP.ui.button('Color Control', { size: 'sm', variant: 'ghost', icon: 'chevron', iconAfter: true, onClick: () => SP.go('color') }),
         body: [
-          SP.ui.row({ path: 'color.brightness', label: 'Brightness', control: SP.ui.slider({ path: 'color.brightness', min: 0, max: 100, unit: '%' }) }),
-          SP.ui.row({ path: 'color.contrast', label: 'Contrast', control: SP.ui.slider({ path: 'color.contrast', min: 0, max: 100, unit: '%' }) }),
-          SP.ui.row({ path: 'color.vibrance', label: 'Digital vibrance', control: SP.ui.slider({ path: 'color.vibrance', min: 0, max: 100, unit: '%' }) }),
-          SP.ui.row({ path: 'color.gamma', label: 'Gamma', adv: true, control: SP.ui.slider({ path: 'color.gamma', min: 0.3, max: 2.8, step: 0.01, format: (v) => v.toFixed(2) }) }),
+          SP.ui.row({ path: SP.tonePath('brightness'), label: 'Brightness', control: SP.ui.slider({ path: SP.tonePath('brightness'), min: 0, max: 100, center: 50, unit: '%', disabled: quickOff }) }),
+          SP.ui.row({ path: SP.tonePath('contrast'), label: 'Contrast', control: SP.ui.slider({ path: SP.tonePath('contrast'), min: 0, max: 100, center: 50, unit: '%', disabled: quickOff }) }),
+          SP.ui.row({ path: 'color.global.vibrance', label: 'Digital vibrance', control: SP.ui.slider({ path: 'color.global.vibrance', min: 0, max: 100, center: 50, unit: '%' }) }),
+          SP.ui.row({ path: SP.tonePath('gamma'), label: 'Gamma', adv: true, control: SP.ui.slider({ path: SP.tonePath('gamma'), min: 0.3, max: 2.8, step: 0.01, center: 1, format: (v) => v.toFixed(2), disabled: quickOff }) }),
         ],
       });
 
@@ -77,14 +83,16 @@
 
       /* Display */
       const vrr = SP.state.getApplied('display.vrr');
-      const hdr = SP.state.getApplied('display.hdr');
+      const hdr = dInfo && dInfo.hdr ? dInfo.hdr.enabled : SP.state.getApplied('display.hdr');
       const display = SP.ui.card({
         icon: 'display', title: 'Display', desc: d.name + (d.primary ? ' · Primary' : ''),
         actions: SP.ui.button('', { size: 'sm', variant: 'ghost', icon: 'chevron', title: 'Display Settings', onClick: () => SP.go('display') }),
         body: h('div', { class: 'sp-kv' },
-          h('div', null, h('span', null, 'Resolution'), h('strong', null, SP.state.getApplied('display.resolution').replace('x', ' × '))),
-          h('div', null, h('span', null, 'Refresh rate'), h('strong', null, SP.state.getApplied('display.refresh') + ' Hz')),
-          h('div', null, h('span', null, 'Variable refresh'), h('strong', { class: vrr ? 'is-on' : '' }, vrr ? 'On' : 'Off')),
+          h('div', null, h('span', null, 'Resolution'), h('strong', null, (d.real ? d.resolutions[0] : SP.state.getApplied('display.resolution')).replace('x', ' × '))),
+          h('div', null, h('span', null, 'Refresh rate'), h('strong', null, (d.real ? d.refresh[0] : SP.state.getApplied('display.refresh')) + ' Hz')),
+          d.real
+            ? h('div', null, h('span', null, 'Bits per channel'), h('strong', null, dInfo && dInfo.hdr && dInfo.hdr.bitsPerChannel ? dInfo.hdr.bitsPerChannel + ' bpc' : '—'))
+            : h('div', null, h('span', null, 'Variable refresh'), h('strong', { class: vrr ? 'is-on' : '' }, vrr ? 'On' : 'Off')),
           h('div', null, h('span', null, 'HDR'), h('strong', { class: hdr ? 'is-on' : '' }, hdr ? 'On' : 'Off'))),
       });
 
