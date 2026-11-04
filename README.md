@@ -6,13 +6,37 @@ A graphics control panel for Windows, styled after Japanese cherry blossoms.
 
 > **Status:** the complete interface, brand identity and theme system are done. **No GPU driver backend is connected yet.** Settings are saved and the apply cycle works end to end, but the values come from `SP.telemetry` and `SP.state.apply()` in place of a real driver. The title bar shows *Demo telemetry* until a backend replaces them.
 
-## Run
+## Install (Windows)
+
+**One line in PowerShell:**
+
+```powershell
+irm https://raw.githubusercontent.com/tfem1/sakura-panel/main/install.ps1 | iex
+```
+
+What the command does:
+1. Installs Git and Node.js LTS with winget if they're missing.
+2. Clones the repo into `%LOCALAPPDATA%\SakuraPanel`.
+3. Runs `npm install`.
+4. Creates **SAKURA PANEL** shortcuts on the Desktop and in the Start menu.
+5. Launches the app.
+
+Run the same command again to update (it does a `git pull`). To uninstall:
+
+```powershell
+irm https://raw.githubusercontent.com/tfem1/sakura-panel/main/uninstall.ps1 | iex
+```
+
+**With git clone:**
 
 ```bash
+git clone https://github.com/tfem1/sakura-panel.git
+cd sakura-panel
 npm install
-npm start            # Electron window (Windows-style native caption buttons, tray, taskbar icon)
-npm run dist         # Windows installer (NSIS) with desktop + Start-menu shortcuts
+npm start            # Electron window (native caption buttons, tray, taskbar icon)
 ```
+
+`npm run dist` builds a Windows installer (NSIS) with desktop and Start-menu shortcuts.
 
 The UI also runs on its own: open `src/index.html` in Chromium or Edge.
 
