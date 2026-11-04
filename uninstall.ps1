@@ -27,6 +27,9 @@ try {
     Write-Host "  ! $Dir does not look like a SAKURA PANEL install - left untouched." -ForegroundColor Yellow
   }
 
+  $tools = Join-Path $env:LOCALAPPDATA 'SakuraPanel-tools'
+  if (Test-Path $tools) { Remove-Item $tools -Recurse -Force; Write-Host "  + Removed portable tools ($tools)" -ForegroundColor Green }
+
   $data = Join-Path $env:APPDATA $AppName
   if ($env:SAKURA_PANEL_PURGE -eq '1' -and (Test-Path $data)) {
     Remove-Item $data -Recurse -Force

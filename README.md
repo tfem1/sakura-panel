@@ -15,7 +15,7 @@ irm https://raw.githubusercontent.com/tfem1/sakura-panel/main/install.ps1 | iex
 ```
 
 What the command does:
-1. Installs Git and Node.js LTS with winget if they're missing.
+1. Uses Git and Node.js if they're installed. Otherwise it installs them with winget, or, if winget is missing or fails, downloads private portable copies. Either way you don't need to restart or re-run anything.
 2. Clones the repo into `%LOCALAPPDATA%\SakuraPanel`.
 3. Runs `npm install`.
 4. Creates **SAKURA PANEL** shortcuts on the Desktop and in the Start menu.

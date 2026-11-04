@@ -3,9 +3,10 @@
 #   irm https://raw.githubusercontent.com/tfem1/sakura-panel/main/install.ps1 | iex
 #
 # What it does:
-#   1. Makes sure Git and Node.js LTS are installed (installs them with winget if missing)
+#   1. Makes sure Git and Node.js LTS are available: uses existing installs, else winget,
+#      else a private portable copy in %LOCALAPPDATA%\SakuraPanel-tools (no restart needed)
 #   2. git clone (or git pull if already installed) into %LOCALAPPDATA%\SakuraPanel
-#   3. npm install (downloads Electron)
+#   3. npm install, then makes sure the Electron runtime is downloaded
 #   4. Creates "SAKURA PANEL" shortcuts on the Desktop and in the Start menu
 #   5. Launches the app
 #
@@ -30,18 +31,63 @@ function Invoke-Native([string]$What, [scriptblock]$Command) {
   if ($LASTEXITCODE -ne 0) { throw "$What failed (exit code $LASTEXITCODE)." }
 }
 
-function Install-Requirement([string]$Command, [string]$WingetId, [string]$Name, [string]$Url) {
+$Tools = Join-Path $env:LOCALAPPDATA 'SakuraPanel-tools'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+function Add-PathIfExists([string[]]$Folders) {
+  foreach ($f in $Folders) { if ($f -and (Test-Path $f) -and (($env:Path -split ';') -notcontains $f)) { $env:Path = "$f;$env:Path" } }
+}
+
+# Where a normal install puts each tool, so a fresh install works without opening a new window.
+$KnownDirs = @{
+  git  = @("$env:ProgramFiles\Git\cmd", "${env:ProgramFiles(x86)}\Git\cmd", "$env:LOCALAPPDATA\Programs\Git\cmd", "$Tools\git\cmd")
+  node = @("$env:ProgramFiles\nodejs", "${env:ProgramFiles(x86)}\nodejs", "$env:LOCALAPPDATA\Programs\nodejs", "$Tools\node")
+}
+
+function Get-Zip([string]$Url, [string]$Dest) {
+  $zip = Join-Path $env:TEMP ([IO.Path]::GetRandomFileName() + '.zip')
+  try {
+    Invoke-WebRequest -Uri $Url -OutFile $zip -UseBasicParsing
+    if (Test-Path $Dest) { Remove-Item $Dest -Recurse -Force }
+    Expand-Archive -Path $zip -DestinationPath $Dest -Force
+  } finally { Remove-Item $zip -Force -ErrorAction SilentlyContinue }
+}
+
+# Portable fallbacks, used only when winget is missing or fails. Private to SAKURA PANEL.
+function Install-PortableNode {
+  $lts = (Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json' -UseBasicParsing | Where-Object { $_.lts } | Select-Object -First 1).version
+  $name = "node-$lts-win-x64"
+  $tmp = Join-Path $Tools 'node-extract'
+  Get-Zip "https://nodejs.org/dist/$lts/$name.zip" $tmp
+  if (Test-Path "$Tools\node") { Remove-Item "$Tools\node" -Recurse -Force }
+  Move-Item (Join-Path $tmp $name) "$Tools\node"
+  Remove-Item $tmp -Recurse -Force
+}
+function Install-PortableGit {
+  $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/git-for-windows/git/releases/latest' -UseBasicParsing -Headers @{ 'User-Agent' = 'sakura-panel-installer' }
+  $asset = $rel.assets | Where-Object { $_.name -match '^MinGit-[\d.]+-64-bit\.zip$' } | Select-Object -First 1
+  if (-not $asset) { throw 'Could not find a portable Git download.' }
+  Get-Zip $asset.browser_download_url "$Tools\git"
+}
+
+function Install-Requirement([string]$Command, [string]$WingetId, [string]$Name, [scriptblock]$Portable) {
+  Add-PathIfExists $KnownDirs[$Command]
   if (Test-Command $Command) { Write-Done "$Name found"; return }
-  if (-not (Test-Command 'winget')) {
-    throw "$Name is required but was not found, and winget is not available. Install $Name from $Url, then run this command again."
+
+  if (Test-Command 'winget') {
+    Write-Step "Installing $Name with winget"
+    try { winget install --id $WingetId --exact --source winget --silent --accept-package-agreements --accept-source-agreements | Out-Host } catch { }
+    Update-SessionPath
+    Add-PathIfExists $KnownDirs[$Command]
+    if (Test-Command $Command) { Write-Done "$Name installed"; return }
   }
-  Write-Step "Installing $Name with winget"
-  winget install --id $WingetId --exact --source winget --silent --accept-package-agreements --accept-source-agreements | Out-Host
-  Update-SessionPath
-  if (-not (Test-Command $Command)) {
-    throw "$Name was installed but is not on PATH in this window yet. Open a new PowerShell window and run the install command again."
-  }
-  Write-Done "$Name installed"
+
+  Write-Step "Downloading a portable $Name for SAKURA PANEL"
+  New-Item -ItemType Directory -Path $Tools -Force | Out-Null
+  & $Portable
+  Add-PathIfExists $KnownDirs[$Command]
+  if (-not (Test-Command $Command)) { throw "$Name could not be installed. Check your internet connection, then run the command again." }
+  Write-Done "$Name ready"
 }
 
 function New-AppShortcut([string]$Folder, [string]$Target, [string]$Arguments, [string]$Icon, [string]$WorkDir) {
@@ -62,8 +108,8 @@ try {
   Write-Host "  Folder: $Dir" -ForegroundColor DarkGray
   Write-Host ''
 
-  Install-Requirement 'git' 'Git.Git' 'Git' 'https://git-scm.com/download/win'
-  Install-Requirement 'node' 'OpenJS.NodeJS.LTS' 'Node.js LTS' 'https://nodejs.org'
+  Install-Requirement 'git' 'Git.Git' 'Git' { Install-PortableGit }
+  Install-Requirement 'node' 'OpenJS.NodeJS.LTS' 'Node.js LTS' { Install-PortableNode }
 
   # Close a running copy so npm can replace Electron's files.
   Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($Dir, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -84,7 +130,16 @@ try {
 
   $electron = Join-Path $Dir 'node_modules\electron\dist\electron.exe'
   $icon = Join-Path $Dir 'assets\icons\sakura-panel.ico'
-  if (-not (Test-Path $electron)) { throw "Electron was not downloaded ($electron is missing). Run the install command again." }
+  if (-not (Test-Path $electron)) {
+    # npm skipped Electron's postinstall (ignore-scripts, newer npm defaults...): run its downloader directly.
+    Write-Step 'Downloading the Electron runtime'
+    Remove-Item Env:\ELECTRON_SKIP_BINARY_DOWNLOAD -ErrorAction SilentlyContinue
+    $installer = Join-Path $Dir 'node_modules\electron\install.js'
+    if (-not (Test-Path $installer)) { throw "The electron package is missing from node_modules. Delete $Dir and run the install command again." }
+    Push-Location $Dir
+    try { Invoke-Native 'Electron download' { node $installer } } finally { Pop-Location }
+  }
+  if (-not (Test-Path $electron)) { throw "Electron could not be downloaded ($electron is missing). Check your internet connection or proxy, then run the install command again." }
   $arguments = '"' + $Dir + '"'
 
   Write-Step 'Creating shortcuts'
